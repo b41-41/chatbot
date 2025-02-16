@@ -7,4 +7,8 @@ llama-cpp-python==0.2.20
 chromadb==0.4.22
 notion-client==2.0.0
 atlassian-python-api>=3.41.0
-pydantic<3.0.0,>=2.0.0 
+pydantic<3.0.0,>=2.0.0
+lxml>=4.9.0
+
+# 모델 다운로드
+# https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct

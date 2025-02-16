@@ -31,3 +31,6 @@ Thumbs.db
 # 임시 파일
 *.tmp
 *.bak
+
+# LLM 모델
+models/

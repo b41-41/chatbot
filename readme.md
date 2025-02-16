@@ -38,10 +38,10 @@ pip install -r requirements.txt
 CONFLUENCE_URL=your_confluence_url
 CONFLUENCE_USERNAME=your_username
 CONFLUENCE_API_TOKEN=your_api_token
+CONFLUENCE_SPACE_KEY=your_space_key
 
 # Notion 설정
 NOTION_API_KEY=your_notion_api_key
-NOTION_DATABASE_ID=your_database_id
 
 # LLM 설정
 LLAMA_MODEL_PATH=path_to_your_llama_model
