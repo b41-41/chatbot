@@ -19,19 +19,18 @@ class ChatService:
             return_messages=True
         )
         self.chain = None
-        self._initialize_chain()
 
     def _initialize_chain(self):
-        if not self.document_manager.vector_store:
-            self.document_manager.load_and_update()
-            
-        self.chain = ConversationalRetrievalChain.from_llm(
-            llm=self.llm,
-            retriever=self.document_manager.vector_store.as_retriever(),
-            memory=self.memory
-        )
+        if self.document_manager.vector_store:
+            self.chain = ConversationalRetrievalChain.from_llm(
+                llm=self.llm,
+                retriever=self.document_manager.vector_store.as_retriever(),
+                memory=self.memory
+            )
 
     def chat(self, query: str) -> str:
+        if not self.chain:
+            raise ValueError("문서가 로드되지 않았습니다. 먼저 /update API를 호출하여 문서를 로드해주세요.")
         response = self.chain({"question": query})
         return response["answer"]
 

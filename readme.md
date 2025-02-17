@@ -97,3 +97,11 @@ python -m uvicorn main:app --reload
 1. LLama 모델 파일이 필요합니다. 적절한 모델을 다운로드하여 경로를 환경변수에 설정하세요.
 2. Confluence와 Notion API 토큰이 필요합니다.
 3. 첫 실행 시 문서 로딩에 시간이 걸릴 수 있습니다.
+
+## 모델 파일 다운로드
+
+LLama 모델 파일은 다음 주소에서 다운로드할 수 있습니다:
+- llama-2-7b-chat.Q4_K_M.gguf: https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf
+
+다운로드한 모델 파일을 `models` 디렉토리에 저장하고 `.env` 파일의 `LLAMA_MODEL_PATH`를 적절히 설정하세요.
+
