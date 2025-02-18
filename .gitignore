@@ -34,3 +34,6 @@ Thumbs.db
 
 # LLM 모델
 models/
+
+# faiss 파일
+faiss_index/
