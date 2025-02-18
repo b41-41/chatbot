@@ -5,6 +5,7 @@ langchain==0.1.0
 langchain-community==0.0.10
 llama-cpp-python==0.2.20
 faiss-cpu==1.10.0
+sentence-transformers>=2.2.2
 notion-client==2.0.0
 atlassian-python-api>=3.41.0
 pydantic<3.0.0,>=2.0.0

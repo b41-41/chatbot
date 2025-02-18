@@ -1,5 +1,5 @@
 from langchain_community.document_loaders import ConfluenceLoader
-from langchain_community.embeddings import LlamaCppEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv, find_dotenv
 import os
@@ -29,12 +29,10 @@ class DocumentManager:
         
         print(f"✅LLAMA_MODEL_PATH: {os.getenv('LLAMA_MODEL_PATH')}")
 
-        self.embeddings = LlamaCppEmbeddings(
-            model_path=os.getenv("LLAMA_MODEL_PATH"),
-            n_ctx=2048,         # 컨텍스트 길이
-            n_batch=512,        # 배치 크기
-            n_gpu_layers=0,     # CPU만 사용
-            verbose=True        # 디버깅을 위한 로그
+        self.embeddings = HuggingFaceEmbeddings(
+            model_name="sentence-transformers/all-MiniLM-L6-v2",
+            model_kwargs={'device': 'cpu'},
+            encode_kwargs={'normalize_embeddings': True}
         )
         
         self.vector_store = None
