@@ -12,7 +12,12 @@ class ChatService:
         self.document_manager = DocumentManager()
         self.llm = LlamaCpp(
             model_path=os.getenv("LLAMA_MODEL_PATH"),
-            temperature=0.7
+            temperature=0.7,
+            n_ctx=4096,
+            n_batch=512,
+            verbose=True,
+            f16_kv=True,
+            streaming=True
         )
         self.memory = ConversationBufferMemory(
             memory_key="chat_history",
@@ -24,8 +29,11 @@ class ChatService:
         if self.document_manager.vector_store:
             self.chain = ConversationalRetrievalChain.from_llm(
                 llm=self.llm,
-                retriever=self.document_manager.vector_store.as_retriever(),
-                memory=self.memory
+                retriever=self.document_manager.vector_store.as_retriever(
+                    search_kwargs={"k": 3}
+                ),
+                memory=self.memory,
+                max_tokens_limit=3000
             )
 
     def chat(self, query: str) -> str:
