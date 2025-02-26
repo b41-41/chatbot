@@ -37,3 +37,4 @@ models/
 
 # faiss 파일
 faiss_index/
+faiss_backups/
