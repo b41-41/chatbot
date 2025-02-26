@@ -49,12 +49,21 @@ class ChatService:
         response = self.chain({"question": query})
         return response["answer"]
 
-    def update_documents(self):
-        # 이미 벡터 스토어가 로드되어 있는지 확인
-        if self.document_manager.vector_store is not None:
-            # 강제 업데이트가 필요한 경우에만 다시 로드하도록 수정 가능
-            return {"message": "이미 문서가 로드되어 있습니다.", "count": 0, "status": "already_loaded"}
+    def update_documents(self, force=False):
+        """
+        문서를 업데이트합니다.
+        
+        Args:
+            force (bool): 강제 업데이트 여부. True이면 이미 인덱스가 있어도 강제로 업데이트합니다.
             
-        count = self.document_manager.load_and_update()
-        self._initialize_chain()
-        return {"message": f"문서 {count}개가 업데이트되었습니다.", "count": count, "status": "updated"} 
+        Returns:
+            dict: 업데이트 결과 정보를 담은 사전
+        """
+        # 문서 매니저를 통해 인덱스 업데이트
+        result = self.document_manager.load_and_update(force_update=force)
+        
+        # 업데이트 완료 후 체인 초기화
+        if result.get("status") == "updated":
+            self._initialize_chain()
+            
+        return result 

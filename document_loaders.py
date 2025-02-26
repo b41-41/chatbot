@@ -4,6 +4,8 @@ from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv, find_dotenv
 import os
 import logging
+import shutil
+import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -41,23 +43,87 @@ class DocumentManager:
         self.try_load_existing_index()
 
     def try_load_existing_index(self):
-        """로컬에 저장된 FAISS 인덱스가 있으면 로드"""
+        """로컬에 저장된 FAISS 인덱스가 있으면 로드하고 유효성 검증"""
         try:
             faiss_path = "faiss_index"
             if os.path.exists(faiss_path):
                 logger.info("기존 FAISS 인덱스 파일 발견, 로드 중...")
                 self.vector_store = FAISS.load_local(faiss_path, self.embeddings)
                 logger.info("기존 FAISS 인덱스 로드 완료")
-                return True
+                
+                # 인덱스 유효성 검증
+                if self.validate_index():
+                    logger.info("FAISS 인덱스 유효성 검증 성공")
+                    return True
+                else:
+                    logger.warning("FAISS 인덱스 유효성 검증 실패, 인덱스를 사용하지 않습니다.")
+                    self.vector_store = None
+                    return False
             else:
                 logger.info("기존 FAISS 인덱스 파일이 없습니다.")
                 return False
         except Exception as e:
             logger.error(f"FAISS 인덱스 로드 중 오류 발생: {e}")
+            self.vector_store = None
+            return False
+    
+    def validate_index(self):
+        """로드된 인덱스의 유효성 검증"""
+        try:
+            if self.vector_store is None:
+                return False
+                
+            # 간단한 쿼리로 검색 테스트 수행
+            test_query = "테스트 쿼리입니다."
+            results = self.vector_store.similarity_search(test_query, k=1)
+            
+            # 결과가 있는지 확인
+            if results and len(results) > 0:
+                logger.info(f"인덱스 유효성 검증 - 검색 결과: {len(results)}개 문서 반환됨")
+                return True
+            else:
+                logger.warning("인덱스 유효성 검증 - 검색 결과가 없습니다.")
+                return False
+                
+        except Exception as e:
+            logger.error(f"인덱스 유효성 검증 중 오류 발생: {e}")
+            return False
+            
+    def backup_index(self):
+        """기존 FAISS 인덱스를 백업"""
+        try:
+            faiss_path = "faiss_index"
+            if os.path.exists(faiss_path):
+                # 백업 폴더 생성
+                backup_dir = "faiss_backups"
+                os.makedirs(backup_dir, exist_ok=True)
+                
+                # 타임스탬프가 포함된 백업 폴더명 생성
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                backup_path = os.path.join(backup_dir, f"faiss_index_{timestamp}")
+                
+                # 인덱스 복사
+                shutil.copytree(faiss_path, backup_path)
+                logger.info(f"FAISS 인덱스 백업 완료: {backup_path}")
+                return True
+            else:
+                logger.info("백업할 FAISS 인덱스가 없습니다.")
+                return False
+        except Exception as e:
+            logger.error(f"FAISS 인덱스 백업 중 오류 발생: {e}")
             return False
 
-    def load_and_update(self):
+    def load_and_update(self, force_update=False):
         try:
+            # 강제 업데이트가 아니고 이미 벡터 스토어가 있으면 업데이트 생략
+            if not force_update and self.vector_store is not None:
+                logger.info("이미 유효한 인덱스가 로드되어 있어 업데이트를 건너뜁니다.")
+                return {"count": 0, "status": "already_loaded"}
+                
+            # 기존 인덱스 백업
+            if self.vector_store is not None or os.path.exists("faiss_index"):
+                self.backup_index()
+            
             # Confluence 문서 로드
             logger.info("Confluence 문서 로딩 시작...")
             all_docs = self.confluence_loader.load(
@@ -90,12 +156,12 @@ class DocumentManager:
                 self.vector_store.save_local("faiss_index")
                 logger.info("벡터 스토어 생성 및 저장 완료")
                 
+                return {"count": len(all_docs), "status": "updated"}
+                
             except Exception as embed_error:
                 logger.error(f"임베딩/벡터 스토어 생성 중 에러: {embed_error}")
                 logger.error(f"에러 타입: {type(embed_error)}")
                 raise embed_error
-            
-            return len(all_docs)
             
         except Exception as e:
             logger.error(f"문서 로드 중 에러 발생: {e}")
