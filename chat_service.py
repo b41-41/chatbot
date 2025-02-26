@@ -4,6 +4,7 @@ from langchain.memory import ConversationBufferMemory
 from document_loaders import DocumentManager
 import os
 from dotenv import load_dotenv
+from langdetect import detect
 
 load_dotenv()
 
@@ -46,7 +47,20 @@ class ChatService:
             # 여전히 체인이 없다면 오류 메시지 반환
             if not self.chain:
                 return "문서가 로드되지 않았습니다. /update API를 호출하여 문서를 로드해주세요."
-        response = self.chain({"question": query})
+        
+        # 입력 언어 감지
+        try:
+            language = detect(query)
+        except:
+            language = "en"  # 언어 감지 실패 시 기본값은 영어
+        
+        # 한국어 입력인 경우, 한국어 응답을 요청하는 프롬프트 추가
+        if language == "ko":
+            prompt = f"{query}\n\nplease answer in korean"
+        else:
+            prompt = query
+            
+        response = self.chain({"question": prompt})
         return response["answer"]
 
     def update_documents(self, force=False):
