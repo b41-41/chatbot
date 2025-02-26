@@ -24,6 +24,9 @@ class ChatService:
             return_messages=True
         )
         self.chain = None
+        
+        # 문서 관리자 초기화 후 체인도 자동으로 초기화
+        self._initialize_chain()
 
     def _initialize_chain(self):
         if self.document_manager.vector_store:
@@ -38,11 +41,20 @@ class ChatService:
 
     def chat(self, query: str) -> str:
         if not self.chain:
-            raise ValueError("문서가 로드되지 않았습니다. 먼저 /update API를 호출하여 문서를 로드해주세요.")
+            # 로드 시도
+            self._initialize_chain()
+            # 여전히 체인이 없다면 오류 메시지 반환
+            if not self.chain:
+                return "문서가 로드되지 않았습니다. /update API를 호출하여 문서를 로드해주세요."
         response = self.chain({"question": query})
         return response["answer"]
 
     def update_documents(self):
+        # 이미 벡터 스토어가 로드되어 있는지 확인
+        if self.document_manager.vector_store is not None:
+            # 강제 업데이트가 필요한 경우에만 다시 로드하도록 수정 가능
+            return {"message": "이미 문서가 로드되어 있습니다.", "count": 0, "status": "already_loaded"}
+            
         count = self.document_manager.load_and_update()
         self._initialize_chain()
-        return count 
+        return {"message": f"문서 {count}개가 업데이트되었습니다.", "count": count, "status": "updated"} 

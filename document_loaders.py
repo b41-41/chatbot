@@ -36,6 +36,25 @@ class DocumentManager:
         )
         
         self.vector_store = None
+        
+        # 기존 faiss 인덱스가 있는지 확인하고 있으면 로드
+        self.try_load_existing_index()
+
+    def try_load_existing_index(self):
+        """로컬에 저장된 FAISS 인덱스가 있으면 로드"""
+        try:
+            faiss_path = "faiss_index"
+            if os.path.exists(faiss_path):
+                logger.info("기존 FAISS 인덱스 파일 발견, 로드 중...")
+                self.vector_store = FAISS.load_local(faiss_path, self.embeddings)
+                logger.info("기존 FAISS 인덱스 로드 완료")
+                return True
+            else:
+                logger.info("기존 FAISS 인덱스 파일이 없습니다.")
+                return False
+        except Exception as e:
+            logger.error(f"FAISS 인덱스 로드 중 오류 발생: {e}")
+            return False
 
     def load_and_update(self):
         try:

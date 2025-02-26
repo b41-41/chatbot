@@ -24,10 +24,15 @@ async def chat(request: ChatRequest):
 @app.post("/update")
 async def update_documents():
     try:
-        logger.info("문서 로딩 시작...")
-        doc_count = chat_service.update_documents()
-        logger.info(f"문서 로딩 완료: {doc_count}개의 문서가 로드되었습니다.")
-        return {"message": f"문서 {doc_count}개가 업데이트되었습니다."}
+        logger.info("문서 로딩 처리 시작...")
+        result = chat_service.update_documents()
+        
+        if result.get("status") == "already_loaded":
+            logger.info("이미 문서가 로드되어 있습니다.")
+            return {"message": "이미 문서가 로드되어 있습니다. 새로 로드할 필요가 없습니다."}
+        
+        logger.info(f"문서 로딩 완료: {result.get('count')}개의 문서가 로드되었습니다.")
+        return {"message": result.get("message")}
     except Exception as e:
         logger.error(f"문서 로딩 중 에러 발생: {e}")
         return {"error": str(e)}, 500 
