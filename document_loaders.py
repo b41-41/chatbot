@@ -6,6 +6,7 @@ import os
 import logging
 import shutil
 import datetime
+from model_downloader import ModelDownloader
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ load_dotenv(env_path, override=True, verbose=True)
 class DocumentManager:
     def __init__(self):
         # 환경변수 값 확인을 위한 로깅
-        for env_var in ["CONFLUENCE_URL", "CONFLUENCE_USERNAME", "CONFLUENCE_API_TOKEN", "CONFLUENCE_SPACE_KEY", "LLAMA_MODEL_PATH"]:
+        for env_var in ["CONFLUENCE_URL", "CONFLUENCE_USERNAME", "CONFLUENCE_API_TOKEN", "CONFLUENCE_SPACE_KEY", "LLAMA_MODEL"]:
             print(f"✅ {env_var}: {os.getenv(env_var)}")
             
         self.confluence_loader = ConfluenceLoader(
@@ -29,10 +30,43 @@ class DocumentManager:
             api_key=os.getenv("CONFLUENCE_API_TOKEN")
         )
         
-        print(f"✅LLAMA_MODEL_PATH: {os.getenv('LLAMA_MODEL_PATH')}")
+        print(f"✅LLAMA_MODEL: {os.getenv('LLAMA_MODEL')}")
+        
+        # 모델 다운로더 인스턴스 생성
+        self.model_downloader = ModelDownloader()
+        
+        # 임베딩 모델 경로 또는 이름 설정
+        embedding_model_path_or_repo = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+        
+        # Hugging Face 레포지토리 경로인지 확인
+        if self._is_hf_repo_path(embedding_model_path_or_repo):
+            # Hugging Face 레포지토리에서 모델 다운로드
+            repo_name = embedding_model_path_or_repo.split('/')[-1]
+            model_dir = os.path.join("models", repo_name)
+            
+            # 이미 다운로드되었는지 확인
+            if not os.path.exists(model_dir):
+                print(f"임베딩 모델 다운로드 시작: {embedding_model_path_or_repo}")
+                self.model_downloader._check_and_download_embedding(embedding_model_path_or_repo)
+            
+            print(f"Hugging Face 레포지토리 임베딩 모델 사용: {model_dir}")
+            model_name = model_dir
+        else:
+            # 일반 모델 사용
+            # Sentence Transformers 모델 사용 방식 확인
+            # 모델이 models/ 디렉토리에 없으면 기본 모델 이름으로 사용
+            model_dir_path = os.path.join("models", embedding_model_path_or_repo)
+            if os.path.exists(model_dir_path):
+                # 로컬 모델 사용
+                print(f"로컬 임베딩 모델 사용: {model_dir_path}")
+                model_name = model_dir_path
+            else:
+                # 기본 모델 사용
+                print(f"기본 임베딩 모델 사용: sentence-transformers/{embedding_model_path_or_repo}")
+                model_name = f"sentence-transformers/{embedding_model_path_or_repo}"
 
         self.embeddings = HuggingFaceEmbeddings(
-            model_name="sentence-transformers/all-MiniLM-L6-v2",
+            model_name=model_name,
             model_kwargs={'device': 'cpu'},
             encode_kwargs={'normalize_embeddings': True}
         )
@@ -41,6 +75,14 @@ class DocumentManager:
         
         # 기존 faiss 인덱스가 있는지 확인하고 있으면 로드
         self.try_load_existing_index()
+
+    def _is_hf_repo_path(self, path):
+        """
+        주어진 경로가 Hugging Face 리포지토리 경로인지 확인합니다.
+        예: unsloth/DeepSeek-R1-GGUF
+        """
+        # '/'를 포함하고 확장자가 없으면 HF 리포지토리 경로로 간주
+        return '/' in path and '.' not in path.split('/')[-1]
 
     def try_load_existing_index(self):
         """로컬에 저장된 FAISS 인덱스가 있으면 로드하고 유효성 검증"""

@@ -10,6 +10,11 @@ notion-client==2.0.0
 atlassian-python-api>=3.41.0
 pydantic<3.0.0,>=2.0.0
 lxml>=4.9.0
+tqdm>=4.66.1
+huggingface_hub>=0.19.0
+hf_transfer>=0.1.5
+langdetect>=1.0.9
+requests>=2.31.0
 
 # 모델 다운로드
 # https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct

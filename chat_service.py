@@ -5,14 +5,36 @@ from document_loaders import DocumentManager
 import os
 from dotenv import load_dotenv
 from langdetect import detect
+from model_downloader import ModelDownloader
 
 load_dotenv()
 
 class ChatService:
     def __init__(self):
         self.document_manager = DocumentManager()
+        
+        # 모델 다운로더 인스턴스 생성
+        self.model_downloader = ModelDownloader()
+        
+        # 환경 변수에서 모델 이름/경로 가져오기
+        model_path_or_repo = os.getenv("LLAMA_MODEL")
+        
+        # Hugging Face 레포지토리 경로인지 확인
+        if model_path_or_repo and '/' in model_path_or_repo and '.' not in model_path_or_repo.split('/')[-1]:
+            # 모델 다운로드 및 실제 파일 경로 얻기
+            actual_model_path = self.model_downloader._download_from_hf_repo(model_path_or_repo)
+            if actual_model_path:
+                # 다운로드 성공 시 파일 경로 설정
+                model_path = os.path.join("models", actual_model_path)
+            else:
+                # 다운로드 실패 시 원래 경로 사용
+                model_path = os.path.join("models", model_path_or_repo)
+        else:
+            # 일반 파일 경로인 경우
+            model_path = os.path.join("models", model_path_or_repo) if model_path_or_repo else None
+        
         self.llm = LlamaCpp(
-            model_path=os.getenv("LLAMA_MODEL_PATH"),
+            model_path=model_path,
             temperature=0.7,
             n_ctx=4096,
             n_batch=512,
