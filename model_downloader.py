@@ -1,9 +1,10 @@
 import os
 import logging
 import requests
+import re
 from pathlib import Path
 from tqdm import tqdm
-from huggingface_hub import snapshot_download, hf_hub_download, list_repo_files
+from huggingface_hub import snapshot_download, hf_hub_download, list_repo_files, hf_hub_url
 from dotenv import load_dotenv
 
 # 로깅 설정
@@ -121,6 +122,34 @@ class ModelDownloader:
                 logger.error(f"레포지토리 {repo_id}에서 GGUF 파일을 찾을 수 없습니다.")
                 return False
             
+            # 분할된 GGUF 파일 패턴 확인
+            split_patterns = [
+                # 패턴 1: filename.gguf.part-1, filename.gguf.part-2 등
+                r'(.+\.gguf)\.part-\d+$',
+                # 패턴 2: filename-00001-of-00003.gguf 등
+                r'(.+)-\d{5}-of-\d{5}\.gguf$'
+            ]
+            
+            # 분할 파일 그룹 식별
+            split_file_groups = self._identify_split_files(gguf_files, split_patterns)
+            
+            # 분할 파일이 있으면 처리
+            if split_file_groups:
+                logger.info(f"분할된 GGUF 파일 그룹 {len(split_file_groups)}개 발견")
+                
+                # 첫 번째 그룹 사용 (여러 모델이 있을 경우)
+                base_name = list(split_file_groups.keys())[0]
+                parts = sorted(split_file_groups[base_name])
+                
+                logger.info(f"분할된 GGUF 파일 병합 시작: {base_name} ({len(parts)}개 파트)")
+                merged_file = self._download_and_merge_parts(repo_id, parts, base_name, local_dir)
+                
+                if merged_file:
+                    return os.path.join(repo_name, os.path.basename(merged_file))
+                    
+                logger.error(f"분할 파일 병합 실패")
+                return False
+            
             # 적절한 모델 파일 선택 (우선순위: Q4_K_M.gguf > Q5_K_M.gguf > 첫 번째 GGUF)
             selected_file = None
             
@@ -159,6 +188,102 @@ class ModelDownloader:
         except Exception as e:
             logger.error(f"Hugging Face 레포지토리에서 모델 다운로드 중 오류 발생: {e}")
             return False
+
+    def _identify_split_files(self, file_list, patterns):
+        """
+        파일 목록에서 분할된 파일 그룹을 식별합니다.
+        
+        Args:
+            file_list: 파일 이름 목록
+            patterns: 분할 파일 패턴 정규식 목록
+            
+        Returns:
+            dict: {base_name: [part_files]} 형태의 딕셔너리
+        """
+        split_files = {}
+        
+        for pattern in patterns:
+            for file in file_list:
+                match = re.match(pattern, file)
+                if match:
+                    base_name = match.group(1)
+                    if base_name not in split_files:
+                        split_files[base_name] = []
+                    split_files[base_name].append(file)
+        
+        # 실제로 분할 파일인지 확인 (2개 이상의 파일이 있는 경우만)
+        return {k: v for k, v in split_files.items() if len(v) > 1}
+
+    def _download_and_merge_parts(self, repo_id, part_files, base_name, local_dir):
+        """
+        분할된 파일들을 다운로드하고 병합합니다.
+        
+        Args:
+            repo_id: Hugging Face 레포지토리 ID
+            part_files: 분할 파일 목록
+            base_name: 기본 파일 이름
+            local_dir: 저장할 로컬 디렉토리
+            
+        Returns:
+            str: 병합된 파일 경로 또는 None
+        """
+        try:
+            # 병합 파일 경로
+            merged_filename = f"{Path(base_name).stem}.gguf"
+            merged_file_path = os.path.join(local_dir, merged_filename)
+            
+            # 이미 병합된 파일이 있는지 확인
+            if os.path.exists(merged_file_path):
+                logger.info(f"병합된 파일이 이미 존재합니다: {merged_file_path}")
+                return merged_file_path
+            
+            # 임시 디렉토리 생성
+            temp_dir = os.path.join(local_dir, "temp_parts")
+            os.makedirs(temp_dir, exist_ok=True)
+            
+            # 모든 파트 다운로드
+            downloaded_parts = []
+            for part in part_files:
+                part_path = os.path.join(temp_dir, os.path.basename(part))
+                if not os.path.exists(part_path):
+                    logger.info(f"파트 다운로드 중: {part}")
+                    url = hf_hub_url(repo_id, part)
+                    response = requests.get(url, stream=True)
+                    response.raise_for_status()
+                    
+                    with open(part_path, 'wb') as f:
+                        total_size = int(response.headers.get('content-length', 0))
+                        with tqdm(total=total_size, unit='B', unit_scale=True, desc=os.path.basename(part)) as pbar:
+                            for chunk in response.iter_content(chunk_size=8192):
+                                if chunk:
+                                    f.write(chunk)
+                                    pbar.update(len(chunk))
+                
+                downloaded_parts.append(part_path)
+            
+            # 파일 병합
+            logger.info(f"파일 병합 중: {merged_file_path}")
+            with open(merged_file_path, 'wb') as outfile:
+                for part_path in sorted(downloaded_parts):
+                    logger.info(f"병합 중: {os.path.basename(part_path)}")
+                    with open(part_path, 'rb') as infile:
+                        while True:
+                            chunk = infile.read(8192)
+                            if not chunk:
+                                break
+                            outfile.write(chunk)
+            
+            logger.info(f"파일 병합 완료: {merged_file_path}")
+            
+            # 성공적으로 병합되었으면 임시 파일 삭제 (옵션)
+            # import shutil
+            # shutil.rmtree(temp_dir)
+            
+            return merged_file_path
+            
+        except Exception as e:
+            logger.error(f"분할 파일 다운로드 및 병합 중 오류 발생: {e}")
+            return None
 
     def _check_and_download_embedding(self, model_name):
         """
