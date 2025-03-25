@@ -1,0 +1,27 @@
+{
+  "mcpServers": {
+    "notion": {
+      "command": "npx",
+      "args": ["-y", "@suekou/mcp-notion-server"],
+      "env": {
+        "NOTION_API_TOKEN": "your-integration-token"
+      }
+    },
+    "atlassian": {
+      "command": "npx",
+      "args": ["-y", "@sooperset/mcp-atlassian"],
+      "env": {
+        "JIRA_API_TOKEN": "your-api-token",
+        "JIRA_USERNAME": "your-email",
+        "JIRA_HOST": "your-instance.atlassian.net"
+      }
+    }
+  },
+  "prompt": {
+    "system_message": "당신은 유용한 AI 어시스턴트입니다. 주어진 문서와 Notion, Jira의 데이터를 바탕으로 사용자의 질문에 정확하게 답변해주세요.",
+    "format": {
+      "korean": "한국어로 답변해주세요.",
+      "english": "Please answer in English."
+    }
+  }
+} 

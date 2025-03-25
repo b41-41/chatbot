@@ -38,3 +38,6 @@ models/
 # faiss 파일
 faiss_index/
 faiss_backups/
+
+# MCP 설정 파일
+mcp.json
