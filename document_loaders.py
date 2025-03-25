@@ -1,4 +1,3 @@
-from langchain_community.document_loaders import ConfluenceLoader
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv, find_dotenv
@@ -20,17 +19,8 @@ load_dotenv(env_path, override=True, verbose=True)
 
 class DocumentManager:
     def __init__(self):
-        # 환경변수 값 확인을 위한 로깅
-        for env_var in ["CONFLUENCE_URL", "CONFLUENCE_USERNAME", "CONFLUENCE_API_TOKEN", "CONFLUENCE_SPACE_KEY", "LLAMA_MODEL"]:
-            print(f"✅ {env_var}: {os.getenv(env_var)}")
-            
-        self.confluence_loader = ConfluenceLoader(
-            url=os.getenv("CONFLUENCE_URL"),
-            username=os.getenv("CONFLUENCE_USERNAME"),
-            api_key=os.getenv("CONFLUENCE_API_TOKEN")
-        )
-        
-        print(f"✅LLAMA_MODEL: {os.getenv('LLAMA_MODEL')}")
+        # LLAMA_MODEL 환경변수 확인
+        print(f"✅ LLAMA_MODEL: {os.getenv('LLAMA_MODEL')}")
         
         # 모델 다운로더 인스턴스 생성
         self.model_downloader = ModelDownloader()
@@ -166,44 +156,20 @@ class DocumentManager:
             if self.vector_store is not None or os.path.exists("faiss_index"):
                 self.backup_index()
             
-            # Confluence 문서 로드
-            logger.info("Confluence 문서 로딩 시작...")
-            all_docs = self.confluence_loader.load(
-                space_key=os.getenv("CONFLUENCE_SPACE_KEY")
-            )
-            logger.info(f"Confluence 문서 {len(all_docs)}개 로드 완료")
+            # MCP로 변경되어 Confluence 문서 로드 부분 제거됨
+            logger.info("MCP 서버를 통해 문서 접근이 이루어집니다. 별도의 문서 로드가 필요하지 않습니다.")
             
-            # 문서 내용 확인을 위한 디버깅
-            if all_docs:
-                logger.info(f"첫 번째 문서 미리보기: {str(all_docs[0])[:200]}...")
-            
-            # FAISS 벡터 스토어 생성
-            logger.info("벡터 스토어 생성 시작...")
-            
-            try:
-                # 임베딩 테스트
-                logger.info("임베딩 테스트 시작...")
-                test_text = "테스트 문장입니다."
-                test_embedding = self.embeddings.embed_query(test_text)
-                logger.info(f"임베딩 테스트 성공: 벡터 크기 {len(test_embedding)}")
-                
-                # 벡터 스토어 생성
-                logger.info("FAISS 벡터 스토어 생성 중...")
-                self.vector_store = FAISS.from_documents(
-                    documents=all_docs,
+            # 벡터 스토어가 없는 경우 빈 인덱스 생성
+            if self.vector_store is None:
+                logger.info("빈 벡터 스토어 생성 중...")
+                self.vector_store = FAISS.from_texts(
+                    texts=["MCP 문서 서버 설정이 필요합니다."],
                     embedding=self.embeddings
                 )
-                
-                # 벡터 스토어 저장
                 self.vector_store.save_local("faiss_index")
-                logger.info("벡터 스토어 생성 및 저장 완료")
-                
-                return {"count": len(all_docs), "status": "updated"}
-                
-            except Exception as embed_error:
-                logger.error(f"임베딩/벡터 스토어 생성 중 에러: {embed_error}")
-                logger.error(f"에러 타입: {type(embed_error)}")
-                raise embed_error
+                logger.info("빈 벡터 스토어 생성 및 저장 완료")
+            
+            return {"count": 0, "status": "updated"}
             
         except Exception as e:
             logger.error(f"문서 로드 중 에러 발생: {e}")
